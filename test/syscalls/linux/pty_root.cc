@@ -31,10 +31,17 @@ namespace {
 TEST(JobControlRootTest, StealTTY) {
   SKIP_IF(!ASSERT_NO_ERRNO_AND_VALUE(HaveCapability(CAP_SYS_ADMIN)));
 
-  // Make this a session leader, which also drops the controlling terminal.
-  // In the gVisor test environment, this test will be run as the session
-  // leader already (as the sentry init process).
+  bool true_root = true;
   if (!IsRunningOnGvisor()) {
+    // If running in Linux, we may only have CAP_SYS_ADMIN in a non-root user
+    // namespace (i.e. we are not truly root). We use init_module as a proxy for
+    // whether we are true root, as it returns EPERM immediately.
+    ASSERT_THAT(syscall(SYS_init_module, nullptr, 0, nullptr), SyscallFails());
+    true_root = errno != EPERM;
+
+    // Make this a session leader, which also drops the controlling terminal.
+    // In the gVisor test environment, this test will be run as the session
+    // leader already (as the sentry init process).
     ASSERT_THAT(setsid(), SyscallSucceeds());
   }
 
@@ -53,8 +60,8 @@ TEST(JobControlRootTest, StealTTY) {
     ASSERT_THAT(setsid(), SyscallSucceeds());
     // We shouldn't be able to steal the terminal with the wrong arg value.
     TEST_PCHECK(ioctl(slave.get(), TIOCSCTTY, 0));
-    // We should be able to steal it here.
-    TEST_PCHECK(!ioctl(slave.get(), TIOCSCTTY, 1));
+    // We should be able to steal it if we are true root.
+    TEST_PCHECK(true_root == !ioctl(slave.get(), TIOCSCTTY, 1));
     _exit(0);
   }
 
