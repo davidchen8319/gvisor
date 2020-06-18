@@ -518,7 +518,7 @@ func (fs *filesystem) unlinkAt(ctx context.Context, rp *vfs.ResolvingPath, dir b
 		if child == nil {
 			return syserror.ENOENT
 		}
-	} else {
+	} else if child == nil || !child.isSynthetic() {
 		err = parent.file.unlinkAt(ctx, name, flags)
 		if err != nil {
 			if child != nil {
