@@ -1193,7 +1193,8 @@ func (fs *filesystem) RenameAt(ctx context.Context, rp *vfs.ResolvingPath, oldPa
 	if newParent.cachedMetadataAuthoritative() {
 		newParent.dirents = nil
 		newParent.touchCMtime()
-		if renamed.isDir() {
+		if renamed.isDir() && (replaced == nil || !replaced.isDir()) {
+			// Increase the link count if we did not replace another directory.
 			newParent.incLinks()
 		}
 	}
